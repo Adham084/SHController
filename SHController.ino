@@ -25,7 +25,9 @@ float light;
 char *ssid = "Redmi 9"; // WiFi SSID.
 char *password = "12345678"; // WiFi password.
 
-#define HOST "https://shserver.onrender.com/api/sensors" // Server domain.
+#define HOST "https://shserver.onrender.com/api/" // Server domain.
+#define SENSORS_API "sensors" // Server domain.
+#define CONTROLS_API "controls" // Server domain.
 //#define HOST "http://192.168.232.3:5257/api/sensors" // Local server domain for testing.
 #define PORT 80 // HTTP Port.
 #define UPDATE_INTERVAL 10000 // How often to send status updates to server.
@@ -38,8 +40,11 @@ void setup()
     while (!Serial)
         delay(100);
 
+    Serial.println("Setup started.");
+
     // Setup pins.
     pinMode(LM35_PIN, INPUT);
+    pinMode(LDR_PIN, INPUT);
     
     // Setup storage.
     InitializeSD();
@@ -62,7 +67,8 @@ void loop()
     Serial.println("Sending Data.");
     Serial.println(payload);
     
-    sendPutRequest(HOST, payload);
+    // TODO: Save state as struct and sync it with one call, i.e. sendState.
+    sendPutRequest(HOST + String(SENSORS_API), payload);
     
     Serial.print("Waiting for ");
     Serial.print(UPDATE_INTERVAL);
