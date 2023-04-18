@@ -2,7 +2,7 @@
 #include "Storage.h"
 
 // General
-#define BAUD 9600 // 115200
+#define BAUD 115200 // Serial bit rate.
 
 // Pins
 #define LM35_PIN 4
@@ -22,12 +22,13 @@ long lastTime;
 float light;
 
 // WiFi
-char *ssid = "Redmi 9";
-char *password = "12345678";
+char *ssid = "Redmi 9"; // WiFi SSID.
+char *password = "12345678"; // WiFi password.
 
-#define HOST "shserver.onrender.com"
-#define PORT 80 // HTTP Port
-#define UPDATE_INTERVAL 10000
+#define HOST "https://shserver.onrender.com/api/sensors" // Server domain.
+//#define HOST "http://192.168.232.3:5257/api/sensors" // Local server domain for testing.
+#define PORT 80 // HTTP Port.
+#define UPDATE_INTERVAL 10000 // How often to send status updates to server.
 
 void setup()
 {
@@ -46,10 +47,6 @@ void setup()
     // Connect to Server.
     connectWiFi(ssid, password);
     //connectServer(HOST, 80);
-    
-    // Debug Temp
-    sendCommand("No DataData");
-    receiveResponse();
 
     // Initialize PLX-DAQ.
     Serial.println("CLEARDATA");

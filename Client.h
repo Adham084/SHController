@@ -1,5 +1,5 @@
-#include <WiFi.h>
-#include <HTTPClient.h>
+#include "WiFi.h"
+#include "HTTPClient.h"
 
 WiFiClient client;
 const int TIMEOUT_INTERVAL = 5000;
@@ -23,7 +23,7 @@ void connectWiFi(char *ssid, char *password)
     // Connected.
     Serial.println();
     Serial.println("WiFi connected.");
-    Serial.println("Board IP address: ");
+    Serial.print("Board IP address: ");
     Serial.println(WiFi.localIP());
 }
 
@@ -53,7 +53,12 @@ void sendPutRequest(String host, String payload)
 {
     HTTPClient http;
 
-    http.begin(host);
+    if (!http.begin(host))
+    {
+        Serial.println("Can not connect to host!");
+        return;
+    }
+
     http.addHeader("Content-Type", "application/json");
     http.addHeader("Content-Length", String(payload.length()));
 
