@@ -1,12 +1,12 @@
-#include "WiFi.h"
 #include "HTTPClient.h"
 
 WiFiClient client;
-const int TIMEOUT_INTERVAL = 5000;
+HTTPClient http;
+
+#define TIMEOUT_INTERVAL 5000
 
 void connectWiFi(char *ssid, char *password)
 {
-    Serial.println("--------------------------------------------------------");
     Serial.print("Connecting to ");
     Serial.println(ssid);
 
@@ -25,11 +25,12 @@ void connectWiFi(char *ssid, char *password)
     Serial.println("WiFi connected.");
     Serial.print("Board IP address: ");
     Serial.println(WiFi.localIP());
+    
+    http.setReuse(true);
 }
 
 void connectServer(char *host, int port)
 {
-    Serial.println("--------------------------------------------------------");
     Serial.print("Connecting to ");
     Serial.print(host);
     Serial.print(":");
@@ -51,8 +52,6 @@ void connectServer(char *host, int port)
 
 void sendPutRequest(String host, String payload)
 {
-    HTTPClient http;
-
     if (!http.begin(host))
     {
         Serial.println("Can not connect to host!");

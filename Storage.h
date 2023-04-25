@@ -1,43 +1,44 @@
-#include "FS.h"
 #include "SD.h"
-#include "SPI.h"
 
-void InitializeSD()
+#define MB 1024*1024
+
+bool InitializeSD()
 {
     if (!SD.begin())
     {
-        Serial.println("Card Mount Failed");
-        return;
+        Serial.println("Card Mount Failed.");
+        return false;
     }
     
     uint8_t cardType = SD.cardType();
 
     if (cardType == CARD_NONE)
     {
-        Serial.println("No SD card attached");
-        return;
+        Serial.println("No SD card attached.");
+        return false;
     }
 
     Serial.print("SD Card Type: ");
     if (cardType == CARD_MMC)
     {
-        Serial.println("MMC");
+        Serial.println("MMC.");
     }
     else if (cardType == CARD_SD)
     {
-        Serial.println("SDSC");
+        Serial.println("SDSC.");
     }
     else if (cardType == CARD_SDHC)
     {
-        Serial.println("SDHC");
+        Serial.println("SDHC.");
     }
     else
     {
-        Serial.println("UNKNOWN");
+        Serial.println("UNKNOWN.");
     }
 
-    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-    Serial.printf("SD Card Size: %lluMB\n", cardSize);
+    Serial.printf("SD Card Size: %lluMB.\n", SD.cardSize() / MB);
+    Serial.printf("\tTotal space: %lluMB\n", SD.totalBytes() / MB);
+    Serial.printf("\tUsed space: %lluMB\n", SD.usedBytes() / MB);
     
     // writeFile("/hello.txt", "Hello");
     // appendFile("/hello.txt", "World!\n");
@@ -46,8 +47,7 @@ void InitializeSD()
     // readFile("/foo.txt");
     // testFileIO("/test.txt");
     
-    Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
-    Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
+    return true;
 }
 
 void readFile(const char *path)
