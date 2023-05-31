@@ -37,7 +37,7 @@ void connectServer(char *host, int port)
     Serial.println(port);
 
     // We must connect to server, keep trying.
-    while (!client.connect(host, port, 5000))
+    while (!client.connect(host, port, TIMEOUT_INTERVAL))
     {
         delay(500);
         Serial.print(".");
