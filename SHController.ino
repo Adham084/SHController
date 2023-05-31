@@ -1,63 +1,78 @@
 #include "Client.h"
 #include "Storage.h"
 #include "DHT.h"
+#include "Arduino_JSON.h"
+
+// Notes
+// RAM 320 KB
+// ROM 1.25 MB
 
 // General
 #define DEBUG false
-#define BAUD 115200  // Serial bit rate.
+#define BAUD 115200 // Serial bit rate.
 
 // Pins
 #define LDR_PIN 36
 #define BUZZER_PIN 17
 #define DHT11_PIN 5
 #define IR_PIN 18
-#define LED_0_PIN 23    // Room 1 LED
-#define LED_1_PIN 22    // Room 2 LED
-#define LED_2_PIN 1     // Garage LED
-#define LED_3_PIN 3     // Fence LEDs
-#define MOTOR_0_PIN 39  // Fan Motor
-#define MOTOR_1_PIN 34  // Garage Door Motor
-#define ML_PB_0_PIN 35  // Garage Door Motor Left Limit Button
-#define ML_PB_1_PIN 32  // Garage Door Motor Right Limit Button
+#define LED_0_PIN 23   // Room 1 LED
+#define LED_1_PIN 22   // Room 2 LED
+#define LED_2_PIN 1    // Garage LED
+#define LED_3_PIN 3    // Fence LEDs
+#define MOTOR_0_PIN 39 // Fan Motor
+#define MOTOR_1_PIN 34 // Garage Door Motor
+#define ML_PB_0_PIN 35 // Garage Door Motor Left Limit Button
+#define ML_PB_1_PIN 32 // Garage Door Motor Right Limit Button
 #define BUTTON_BUILTIN 0
 // LED_BUILTIN 2
 
 // DHT11
 DHT dht11(DHT11_PIN, DHT11);
-float humidity;
-float temperature;
-float heatIndex;
+// float humidity;
+// float temperature;
+// float heatIndex;
 
 float temperatureFan = 28;
 float temperatureAlarm = 45;
 
 // LDR
-float light;
+// float light;
 float lightThreshold = 50;
 
 // IR
+int doorDelay = 60000;
 
 // WiFi
-char *ssid = "Redmi 9";       // WiFi SSID.
-char *password = "12345678";  // WiFi password.
+char *ssid = "Redmi 9";      // WiFi SSID.
+char *password = "12345678"; // WiFi password.
 #if DEBUG
-#define HOST "http://192.168.232.3:5257/api/"  // Local server domain for testing.
+#define HOST "http://192.168.232.3:5257/api/" // Local server domain for testing.
 #else
-#define HOST "https://shserver.onrender.com/api/"  // Server domain.
+#define HOST "https://shserver.onrender.com/api/" // Server domain.
 #endif
 
-#define SENSORS_API HOST + "sensors"    // Sensors API URL.
-#define CONTROLS_API HOST + "controls"  // Controls API URL.
-#define UPDATE_INTERVAL 5000            // How often to send status updates to server in ms.
+#define SENSORS_API HOST + String("sensors")   // Sensors API URL.
+#define CONTROLS_API HOST + String("controls") // Controls API URL.
+#define UPDATE_INTERVAL 5000                   // How often to send status updates to server in ms.
 
-void setup() {
+// Private State
+JSONVar controls;
+JSONVar sensors;
+long lastSendTime;
+long irStartDelay;
+
+hw_timer_t *Timer0_Cfg = NULL;
+
+void setup()
+{
   // Setup built-in functional pins.
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUTTON_BUILTIN, INPUT);
-  
+
   // Indicate setup started.
   digitalWrite(LED_BUILTIN, HIGH);
-  
+
   // Setup pins.
   pinMode(LDR_PIN, INPUT);
   pinMode(BUZZER_PIN, OUTPUT);
@@ -71,7 +86,15 @@ void setup() {
   pinMode(MOTOR_1_PIN, OUTPUT);
   pinMode(ML_PB_0_PIN, INPUT);
   pinMode(ML_PB_1_PIN, INPUT);
-  
+
+  // Initialize hardware timer.
+  Timer0_Cfg = timerBegin(0, 80, true);
+  timerAttachInterrupt(Timer0_Cfg, &irTimerElapsed, true);
+  // Assume clock rate of 80 MHz and divider of 80, results in 1000000 Hz,
+  // divide it by 1000 to get it in ms.
+  timerAlarmWrite(Timer0_Cfg, 1000 * doorDelay, false);
+  timerAlarmEnable(Timer0_Cfg);
+
   // Initialize DHT11 sensor.
   dht11.begin();
 
@@ -103,53 +126,111 @@ void setup() {
   digitalWrite(LED_BUILTIN, LOW);
 }
 
-void loop() {
-  if (!digitalRead(BUTTON_BUILTIN)) {
+void loop()
+{
+  if (!digitalRead(BUTTON_BUILTIN))
+  {
     // TODO: Enter config mode.
     return;
   }
 
-  readLight();
-  readTemp();
+  readLDR();
+  readDHT11();
 
-  String payload = "{\"temp\":" + String(temperature, 1) + ",\"light\":" + String(light, 1) + "}";
-  Serial.println("Sending Data.");
-  Serial.println(payload);
+  if (millis() - lastSendTime >= UPDATE_INTERVAL)
+  {
+    Serial.println("Sending Data.");
 
-  // TODO: Save state as struct and sync it with one call, i.e. sendState.
-  sendPutRequest(HOST + String(SENSORS_API), payload);
+    sensors["SDFree"] = sdSpace();
 
-  Serial.print("Waiting for ");
-  Serial.print(UPDATE_INTERVAL);
-  Serial.println(" ms.");
+    // controls["RoomLight"] =
+    //     controls["GarageLight"] =
+    //         controls["HallLight"] =
+    //             controls["FenceLight"] =
+    //                 controls["GarageDoor"] =
+    //                     controls["Fan"] =
+    //                         controls["Alarm"] =
 
-  delay(UPDATE_INTERVAL);
+    String sensorsPayload = JSON.stringify(sensors);
+    String controlsPayload = JSON.stringify(controls);
+
+    Serial.println(sensorsPayload);
+    Serial.println(controlsPayload);
+
+    sendPutRequest(SENSORS_API, sensorsPayload);
+    sendPutRequest(CONTROLS_API, controlsPayload);
+
+    Serial.print("Waiting for ");
+    Serial.print(UPDATE_INTERVAL);
+    Serial.println(" ms.");
+
+    lastSendTime = millis();
+  }
 }
 
-void readLight() {
-  light = (analogRead(LDR_PIN) / 4096.0) * 100.0;
+void readLDR()
+{
+  float light = (analogRead(LDR_PIN) / 4096.0) * 100.0;
 
-  if (light < lightThreshold) {
+  sensors["Light"] = light;
+
+  if (light < lightThreshold)
+  {
     digitalWrite(LED_3_PIN, HIGH);
-  } else {
+  }
+  else
+  {
     digitalWrite(LED_3_PIN, LOW);
   }
 }
 
-void readTemp() {
-  temperature = dht11.readTemperature();
-  humidity = dht11.readHumidity();
-  heatIndex = dht11.computeHeatIndex(temperature, humidity, false);
+void readDHT11()
+{
+  float temperature = dht11.readTemperature();
+  float humidity = dht11.readHumidity();
+  float heatIndex = dht11.computeHeatIndex(temperature, humidity, false);
 
-  if (temperature > temperatureFan) {
+  sensors["Temperature"] = temperature;
+  sensors["Humidity"] = humidity;
+  sensors["HeatIndex"] = heatIndex;
+
+  if (temperature > temperatureFan)
+  {
     digitalWrite(MOTOR_0_PIN, HIGH);
-  } else {
+  }
+  else
+  {
     digitalWrite(MOTOR_0_PIN, LOW);
   }
 
-  if (temperature > temperatureAlarm) {
+  if (temperature > temperatureAlarm)
+  {
     digitalWrite(BUZZER_PIN, HIGH);
-  } else {
+  }
+  else
+  {
     digitalWrite(BUZZER_PIN, LOW);
   }
+}
+
+void readIR()
+{
+  int ir = digitalRead(IR_PIN);
+
+  sensors["IR"] = ir;
+
+  if (ir)
+  {
+    // Open the door and turn on the led.
+    
+    timerRestart(Timer0_Cfg);
+    timerStart(Timer0_Cfg);
+  }
+}
+
+void irTimerElapsed()
+{
+  timerStop(Timer0_Cfg);
+  
+  // Close the door and turn off the led.
 }

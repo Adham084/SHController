@@ -50,6 +50,11 @@ bool InitializeSD()
     return true;
 }
 
+float sdSpace()
+{
+    
+}
+
 void readFile(const char *path)
 {
     Serial.printf("Reading file: %s\n", path);
