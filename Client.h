@@ -1,11 +1,11 @@
 #include "HTTPClient.h"
 
+#define TIMEOUT_INTERVAL 5000 // ms
+
 WiFiClient client;
 HTTPClient http;
 
-#define TIMEOUT_INTERVAL 5000
-
-void connectWiFi(char *ssid, char *password)
+void connectWiFi(const char *ssid, const char *password)
 {
     Serial.print("Connecting to ");
     Serial.println(ssid);
@@ -24,34 +24,19 @@ void connectWiFi(char *ssid, char *password)
     Serial.println();
     Serial.println("WiFi connected.");
     Serial.print("Board IP address: ");
-    Serial.println(WiFi.localIP());
-    
+    Serial.println(WiFi.localIP().toString());
+
     http.setReuse(true);
 }
 
-void connectServer(char *host, int port)
+void sendPutRequest(const char *host, String payload)
 {
-    Serial.print("Connecting to ");
-    Serial.print(host);
-    Serial.print(":");
-    Serial.println(port);
-
-    // We must connect to server, keep trying.
-    while (!client.connect(host, port, TIMEOUT_INTERVAL))
+    if (WiFi.status() != WL_CONNECTED)
     {
-        delay(500);
-        Serial.print(".");
+        Serial.println("WiFi disconnected!");
+        return;
     }
 
-    // Connected.
-    Serial.println();
-    Serial.println("Server connected.");
-    Serial.println("Server IP address: ");
-    Serial.println(client.remoteIP());
-}
-
-void sendPutRequest(String host, String payload)
-{
     if (!http.begin(host))
     {
         Serial.println("Can not connect to host!");
@@ -69,30 +54,23 @@ void sendPutRequest(String host, String payload)
     http.end();
 }
 
-void sendCommand(char *cmd)
+const char *sendGetRequest(const char *host)
 {
-    client.print(cmd);
-}
-
-void receiveResponse()
-{
-    // Save the time we started waiting.
-    unsigned long timeout = millis();
-
-    // Wait for the response from server.
-    while (client.available() == 0)
+    if (WiFi.status() != WL_CONNECTED)
     {
-        if (millis() - timeout > TIMEOUT_INTERVAL)
-        {
-            Serial.println(">>> Client Timeout!");
-            return;
-        }
+        Serial.println("WiFi disconnected!");
+        return "";
     }
 
-    // Read all the lines of the reply from server and print them to Serial.
-    while (client.available())
+    if (!http.begin(host))
     {
-        String line = client.readStringUntil('\n');
-        Serial.println(line);
+        Serial.println("Can not connect to host!");
+        return "";
     }
+
+    int httpResponseCode = http.GET();
+    String payload = httpResponseCode == 200 ? http.getString() : "";
+    http.end();
+
+    return payload.c_str();
 }
