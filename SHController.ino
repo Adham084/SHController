@@ -157,7 +157,7 @@ void loop()
     int l = schedules.length();
     
     for (int i = 0; i < l; i++)
-      nextCell[i] = 0;
+      nextCell[i] = 1;
   }
   
   builtinBtn.loop();
@@ -371,7 +371,7 @@ void parseSchedules(String json)
   {
     int l2 = schedules[i].length();
     
-    for (int j = 0; j < l2; j++)
+    for (int j = 1; j < l2; j++)
     {
       if ((long)schedules[i][j]["time"] >= secondOfDay)
       {
