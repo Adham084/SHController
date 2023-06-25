@@ -63,7 +63,12 @@ hw_timer_t *syncTimer;
 TaskHandle_t motorStopOnLimitTask;
 
 // Constants
-void (*actions[])() = {nullptr};
+void (*actions[])() = {
+  [](){ setGarageDoor(true); },
+  [](){ setGarageDoor(false); },
+  [](){ setGarageLight(true); },
+  [](){ setGarageLight(false); },
+};
 
 // Core functions ======================================================================================
 void setup()
